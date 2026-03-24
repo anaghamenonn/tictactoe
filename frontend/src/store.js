@@ -12,7 +12,7 @@ export const useGameStore = create((set) => ({
   session: null,
 
   matchId: null,
-  /** True only when this match was created via "Create room" with Classic mode — show invite-a-friend UI while waiting. */
+  /** True only when this client used "Create room" — show invite-a-friend UI while waiting (any mode). */
   inviteFriendRoom: false,
   gameMode: "classic",
 

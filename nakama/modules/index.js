@@ -61,6 +61,26 @@ function normalizeModeFromParams(params) {
   return m === "timed" ? "timed" : "classic";
 }
 
+/**
+ * How this match was created. Use string values only — Nakama matchCreate params are
+ * typically map[string] string; booleans may not reach matchInit reliably.
+ * @returns {"invite" | "matchmaker"}
+ */
+function normalizeInviteSourceFromParams(params) {
+  var raw = params;
+  if (typeof raw === "string" && raw.length > 0) {
+    try {
+      raw = JSON.parse(raw);
+    } catch (e) {
+      return "matchmaker";
+    }
+  }
+  if (!raw || typeof raw !== "object") return "matchmaker";
+  var s = raw.inviteSource != null ? String(raw.inviteSource) : "";
+  if (s === "invite") return "invite";
+  return "matchmaker";
+}
+
 function parseRpcPayload(payload) {
   if (payload == null || payload === "") return {};
   if (typeof payload === "object") return payload;
@@ -73,6 +93,7 @@ function parseRpcPayload(payload) {
 
 var matchInit = function (ctx, logger, nk, params) {
   var mode = normalizeModeFromParams(params);
+  var inviteSource = normalizeInviteSourceFromParams(params);
 
   return {
     state: {
@@ -85,12 +106,14 @@ var matchInit = function (ctx, logger, nk, params) {
       endReason: null,
       phase: "waiting",
       mode: mode,
+      inviteSource: inviteSource,
       secondsLeft: 0,
       statsWritten: false,
     },
     label: JSON.stringify({
       mode: mode,
-      open: true
+      open: true,
+      inviteSource: inviteSource
     }),
     tickRate: 1,
   };
@@ -118,6 +141,7 @@ var matchJoin = function (ctx, logger, nk, dispatcher, tick, state, presences) {
   if (state.playerXId && state.playerOId) {
     state.phase = "playing";
     if (state.mode === "timed") {
+      // Always reset timer to 30s when both players are present and phase is playing
       state.secondsLeft = 30;
     }
   }
@@ -291,21 +315,37 @@ var matchSignal = function (ctx, logger, nk, dispatcher, tick, state, data) {
   return { state: state, data: "" };
 };
 
-var matchmakerMatched = function (ctx, logger, nk, matches) {
-  var mode = "classic";
-  if (matches && matches.length > 0) {
-    var e = matches[0];
-    /** Nakama JS passes merged string+numeric props on `properties` (see MatchmakerMatched in server). */
-    var props =
-      (e && e.properties) ||
-      (e && e.stringProperties) ||
-      (e && e.string_properties) ||
-      {};
-    if (props.mode === "timed") {
-      mode = "timed";
+/**
+ * Nakama passes one object per matched ticket: { presence, properties }.
+ * `properties` merges string_properties + numeric_properties from the ticket (runtime_javascript.go).
+ */
+function modeFromMatchmakerEntries(entries) {
+  if (!entries) return "classic";
+  var len = entries.length;
+  if (typeof len !== "number" || len < 1) return "classic";
+  for (var i = 0; i < len; i++) {
+    try {
+      var e = entries[i];
+      if (!e) continue;
+      var props = e.properties;
+      if (!props) continue;
+      var raw = props.mode;
+      if (raw == null || raw === "") continue;
+      var m = String(raw).trim().toLowerCase();
+      if (m === "timed") return "timed";
+    } catch (e0) {
+      /* ignore bad entries */
     }
   }
-  return nk.matchCreate("tic-tac-toe", { mode: mode });
+  return "classic";
+}
+
+var matchmakerMatched = function (ctx, logger, nk, matches) {
+  var mode = modeFromMatchmakerEntries(matches);
+  return nk.matchCreate("tic-tac-toe", {
+    mode: mode,
+    inviteSource: "matchmaker"
+  });
 };
 
 /** Create an authoritative match (room) with the chosen mode; client joins with returned match_id. */
@@ -317,7 +357,10 @@ var rpcCreateTictactoeMatch = function (ctx, logger, nk, payload) {
   } catch (e0) {
     logger.error("create match parse: %s", String(e0));
   }
-  var matchId = nk.matchCreate("tic-tac-toe", { mode: mode });
+  var matchId = nk.matchCreate("tic-tac-toe", {
+    mode: mode,
+    inviteSource: "invite"
+  });
   return JSON.stringify({ match_id: matchId, mode: mode });
 };
 

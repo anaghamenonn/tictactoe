@@ -97,6 +97,9 @@ export default function App() {
             const match = await joinMatchFromMatchmaker(socket, matched);
             setInviteFriendRoom(false);
             setMatchId(match.match_id);
+            setMatchEntry("matchmaker");
+            // Set lobbyGameMode for fallback timer logic
+            setGameMode((matched.properties?.mode || "classic").toLowerCase());
             setConnectionStatus("ready");
           } catch (e) {
             setError(e?.message ?? String(e));
@@ -196,6 +199,8 @@ export default function App() {
       const match = await socket.joinMatch(mid);
       setInviteFriendRoom(true);
       setMatchId(match.match_id);
+      setMatchEntry("create_room");
+      setGameMode(gameMode); // Ensure lobbyGameMode is set
       setJoinInAddressBar(match.match_id);
       setConnectionStatus("ready");
     } catch (e) {
@@ -236,6 +241,8 @@ export default function App() {
         const match = await socket.joinMatch(matchIdToJoin);
         setInviteFriendRoom(false);
         setMatchId(match.match_id);
+        setMatchEntry("join_id");
+        // No way to know mode here, so fallback logic will use server state
         clearJoinFromAddressBar();
         setConnectionStatus("ready");
       } catch (e) {

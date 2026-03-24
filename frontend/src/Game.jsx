@@ -59,11 +59,13 @@ export default function Game({ onMove, onLeave }) {
   const outcome = getOutcome(gameState, session?.user_id);
   const showGameOver = outcome !== null;
 
-  const isTimed = gameState.mode === "timed";
-  const secondsLeft =
-    typeof gameState.secondsLeft === "number"
-      ? Math.max(0, gameState.secondsLeft)
-      : 0;
+  const isTimed = String(gameState.mode ?? "").toLowerCase() === "timed";
+  const secondsLeft = (() => {
+    const v = gameState.secondsLeft;
+    if (typeof v === "number" && !Number.isNaN(v)) return Math.max(0, v);
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+  })();
 
   const statusLine = (() => {
     if (gameState.phase === "waiting") {
@@ -79,6 +81,16 @@ export default function Game({ onMove, onLeave }) {
   })();
 
   const modeTitle = isTimed ? "Timed (30s per turn)" : "Classic";
+
+  /** Create-room (wait for friend) timed lobby — from server or local flag for host before first state. */
+  const inInviteTimedLobby =
+    isTimed &&
+    gameState.phase === "waiting" &&
+    (gameState.inviteSource === "invite" || inviteFriendRoom);
+
+  // Always show timer in Timed mode when playing, and in invite lobby for host
+  const showTimedTimerAside =
+    isTimed && !showGameOver && (gameState.phase === "playing" || inInviteTimedLobby);
 
   return (
     <section className="panel game game-wrap">
@@ -102,10 +114,10 @@ export default function Game({ onMove, onLeave }) {
               <button type="button" className="ghost ghost-inline" onClick={onLeave}>
                 Leave
               </button>
-              {isTimed && !showGameOver ? (
+              {showTimedTimerAside ? (
                 <aside className="game-timer-aside" aria-live="polite">
                   <p className="game-timer-label">Time left</p>
-                  {gameState.phase === "waiting" ? (
+                  {inInviteTimedLobby ? (
                     <p className="game-timer-placeholder muted">
                       Starts when both players are in
                     </p>
