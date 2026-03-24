@@ -4,6 +4,8 @@ import { create } from "zustand";
  * UI + Nakama handles. Game state comes from the server via onmatchdata only.
  */
 export const useGameStore = create((set) => ({
+  /** True after Nakama init stabilizes; main UI mounts once to avoid flicker. */
+  appReady: false,
   connectionStatus: "idle",
   error: null,
 
@@ -12,6 +14,8 @@ export const useGameStore = create((set) => ({
   session: null,
 
   matchId: null,
+  /** How the current match was entered (matchmaker / create_room / join_id); optional UI metadata. */
+  matchEntry: null,
   /** True only when this client used "Create room" — show invite-a-friend UI while waiting (any mode). */
   inviteFriendRoom: false,
   gameMode: "classic",
@@ -25,11 +29,13 @@ export const useGameStore = create((set) => ({
 
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
   setError: (error) => set({ error }),
+  setAppReady: (appReady) => set({ appReady }),
 
   setNakama: ({ client, socket, session }) =>
     set({ client, socket, session }),
 
   setMatchId: (matchId) => set({ matchId }),
+  setMatchEntry: (matchEntry) => set({ matchEntry }),
   setInviteFriendRoom: (inviteFriendRoom) => set({ inviteFriendRoom }),
   setGameMode: (gameMode) => set({ gameMode }),
 
@@ -41,6 +47,7 @@ export const useGameStore = create((set) => ({
   resetMatch: () =>
     set({
       matchId: null,
+      matchEntry: null,
       gameState: null,
       inviteFriendRoom: false,
     }),

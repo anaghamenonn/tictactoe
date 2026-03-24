@@ -14,15 +14,25 @@ import Game from "./Game.jsx";
 import LeaderboardPanel from "./components/LeaderboardPanel.jsx";
 import "./App.css";
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default function App() {
   const socketRef = useRef(null);
   const clientRef = useRef(null);
   const sessionRef = useRef(null);
-  /** When true, socket closed due to effect cleanup — do not set status to idle (StrictMode / remount race). */
+  /** Ignore socket ondisconnect until post-connect stabilization (avoids resetMatch during init / StrictMode). */
+  const disconnectHandlingEnabledRef = useRef(false);
+  const appReady = useGameStore((s) => s.appReady);
+  const connectionStatusForInit = useGameStore((s) => s.connectionStatus);
+  const initScreenError = useGameStore((s) => s.error);
   const setNakama = useGameStore((s) => s.setNakama);
   const setConnectionStatus = useGameStore((s) => s.setConnectionStatus);
   const setError = useGameStore((s) => s.setError);
   const setMatchId = useGameStore((s) => s.setMatchId);
+  const setMatchEntry = useGameStore((s) => s.setMatchEntry);
+  const setGameMode = useGameStore((s) => s.setGameMode);
   const setInviteFriendRoom = useGameStore((s) => s.setInviteFriendRoom);
   const setGameState = useGameStore((s) => s.setGameState);
   const setLeaderboard = useGameStore((s) => s.setLeaderboard);
@@ -70,6 +80,8 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    disconnectHandlingEnabledRef.current = false;
+    useGameStore.getState().setAppReady(false);
 
     async function run() {
       setConnectionStatus("connecting");
@@ -108,6 +120,7 @@ export default function App() {
         };
 
         socket.ondisconnect = () => {
+          if (!disconnectHandlingEnabledRef.current) return;
           setConnectionStatus("idle");
           setError("Disconnected from server");
           resetMatch();
@@ -136,9 +149,16 @@ export default function App() {
             clearJoinFromAddressBar();
           }
         }
+
+        if (!cancelled) await delay(250);
+        if (!cancelled) {
+          useGameStore.getState().setAppReady(true);
+          disconnectHandlingEnabledRef.current = true;
+        }
       } catch (e) {
         setError(e?.message ?? String(e));
         setConnectionStatus("idle");
+        if (!cancelled) useGameStore.getState().setAppReady(false);
       }
     }
 
@@ -146,6 +166,8 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      disconnectHandlingEnabledRef.current = false;
+      useGameStore.getState().setAppReady(false);
       const s = socketRef.current;
       if (s) {
         s.ondisconnect = () => {};
@@ -162,8 +184,11 @@ export default function App() {
     setGameState,
     loadLeaderboard,
     loadMyStats,
+    setMatchEntry,
+    setGameMode,
     setMatchId,
     setNakama,
+    setInviteFriendRoom,
   ]);
 
   const findMatch = useCallback(async () => {
@@ -278,10 +303,29 @@ export default function App() {
     await socket.sendMatchState(mid, 1, JSON.stringify({ index }));
   }, []);
 
+  if (!appReady) {
+    const initFailed =
+      connectionStatusForInit === "idle" && Boolean(initScreenError);
+    return (
+      <div className="app-shell app-shell--loading">
+        <div className="app-loading" role="status" aria-live="polite">
+          <p className="app-loading__title">
+            {initFailed ? "Could not connect" : "Connecting…"}
+          </p>
+          <p className="app-loading__hint">
+            {initFailed
+              ? initScreenError
+              : "Setting up your session with the game server."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <main className="main">
-        {!matchId ? (
+        <div className="main-view" hidden={Boolean(matchId)}>
           <MatchLobby
             onFindMatch={findMatch}
             onCreateRoom={createRoom}
@@ -289,9 +333,10 @@ export default function App() {
             onJoinRoom={joinRoomById}
             openMatches={openMatches}
           />
-        ) : (
+        </div>
+        <div className="main-view" hidden={!matchId}>
           <Game onMove={makeMove} onLeave={leaveMatch} />
-        )}
+        </div>
       </main>
       <LeaderboardPanel onRefresh={refreshLeaderboardAndStats} />
     </div>
