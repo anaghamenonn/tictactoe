@@ -194,7 +194,7 @@ export default function App() {
       const mid = res.payload?.match_id;
       if (!mid) throw new Error("Server did not return match_id");
       const match = await socket.joinMatch(mid);
-      setInviteFriendRoom(gameMode === "classic");
+      setInviteFriendRoom(true);
       setMatchId(match.match_id);
       setJoinInAddressBar(match.match_id);
       setConnectionStatus("ready");

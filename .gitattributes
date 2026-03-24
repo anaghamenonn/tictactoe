@@ -1,0 +1,2 @@
+# Shell used by Docker on Linux; CRLF breaks shebang on Render
+docker-entrypoint.sh text eol=lf

@@ -98,9 +98,29 @@ export default function Game({ onMove, onLeave }) {
               <p className="mono small">{matchId}</p>
             </div>
 
-            <button type="button" className="ghost ghost-inline" onClick={onLeave}>
-              Leave
-            </button>
+            <div className="game-head-end">
+              <button type="button" className="ghost ghost-inline" onClick={onLeave}>
+                Leave
+              </button>
+              {isTimed && !showGameOver ? (
+                <aside className="game-timer-aside" aria-live="polite">
+                  <p className="game-timer-label">Time left</p>
+                  {gameState.phase === "waiting" ? (
+                    <p className="game-timer-placeholder muted">
+                      Starts when both players are in
+                    </p>
+                  ) : (
+                    <p
+                      className="game-timer-value"
+                      aria-label={`${secondsLeft} seconds left this turn`}
+                    >
+                      {secondsLeft}
+                      <span className="game-timer-unit">s</span>
+                    </p>
+                  )}
+                </aside>
+              ) : null}
+            </div>
           </header>
 
           <p className="status">{statusLine}</p>
@@ -154,20 +174,6 @@ export default function Game({ onMove, onLeave }) {
             ))}
           </div>
         </div>
-
-        {isTimed && !showGameOver ? (
-          <aside className="game-timer-aside" aria-live="polite">
-            <p className="game-timer-label">Time left</p>
-            {gameState.phase === "waiting" ? (
-              <p className="game-timer-placeholder muted">Starts when both players are in</p>
-            ) : (
-              <p className="game-timer-value" aria-label={`${secondsLeft} seconds left this turn`}>
-                {secondsLeft}
-                <span className="game-timer-unit">s</span>
-              </p>
-            )}
-          </aside>
-        ) : null}
       </div>
     </section>
   );

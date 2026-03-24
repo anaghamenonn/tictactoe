@@ -261,25 +261,9 @@ button.ghost {
   gap: 1rem;
 }
 
-@media (min-width: 720px) {
-  .game-layout {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 1.5rem;
-  }
-
-  .game-main {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .game-timer-aside {
-    margin-left: auto;
-  }
-}
-
 .game-main {
   width: 100%;
+  min-width: 0;
 }
 
 .game-timer-aside {
@@ -328,6 +312,18 @@ button.ghost {
   align-items: flex-start;
   gap: 1rem;
   margin-bottom: 0.75rem;
+}
+
+.game-head-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.game-head .game-timer-aside {
+  max-width: 11rem;
 }
 
 .eyebrow {
