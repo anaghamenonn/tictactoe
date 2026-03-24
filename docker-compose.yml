@@ -1,0 +1,50 @@
+services:
+  cockroachdb:
+    image: cockroachdb/cockroach:latest
+    command: start-single-node --insecure
+    volumes:
+      - cockroach-data:/cockroach/cockroach-data
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "cockroach", "sql", "--insecure", "--host=127.0.0.1", "-e", "SELECT 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+
+  nakama:
+    image: heroiclabs/nakama:3.15.0
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    ports:
+      - "7350:7350"
+      - "7351:7351"
+    volumes:
+      - ./nakama:/nakama/data   # ✅ CORRECT
+    entrypoint:
+      - /bin/sh
+      - -ecx
+      - |
+        echo "Waiting for CockroachDB..."
+
+        for i in $(seq 1 20); do
+          echo "Attempt $$i..."
+
+          /nakama/nakama migrate up --database.address root@cockroachdb:26257 && break
+
+          echo "DB not ready yet..."
+          sleep 2
+        done
+
+        echo "Starting Nakama..."
+
+        exec /nakama/nakama \
+          --database.address root@cockroachdb:26257 \
+          --logger.level debug \
+          --runtime.path /nakama/data/modules
+
+volumes:
+  cockroach-data:
